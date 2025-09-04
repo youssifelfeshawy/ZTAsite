@@ -7,6 +7,7 @@ error_reporting(E_ALL);
 // Embedded OpenIDConnectClient library code (full class from jumbojett/OpenID-Connect-PHP)
 class OpenIDConnectClientException extends Exception {}
 
+
 class OpenIDConnectClient
 {
     /**
@@ -141,6 +142,10 @@ class OpenIDConnectClient
      */
     protected $tokenExpiration = null;
 
+    $oidc->setAuthUrl('http://192.168.1.134:8080/realms/ZTAsite/protocol/openid-connect/auth');
+    $oidc->setTokenUrl('http://192.168.1.134:8080/realms/ZTAsite/protocol/openid-connect/token');
+    $oidc->setUserInfoUrl('http://192.168.1.134:8080/realms/ZTAsite/protocol/openid-connect/userinfo');
+
     /**
      * Constructor
      *
@@ -242,3 +247,5 @@ if (isset($_GET['code'])) {
         die('Login redirect error: ' . $e->getMessage() . ' (Check redirect URL or Keycloak availability.)');
     }
 }
+
+
