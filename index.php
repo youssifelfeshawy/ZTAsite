@@ -1,47 +1,41 @@
 <?php
-require 'vendor/autoload.php';  // From composer
-
-use Maicol07\OIDCClient\OIDCClient;
+require 'OpenIDConnectClient.php';  // The downloaded file
 
 session_start();
 
-// Keycloak config (adjust IPs/ports)
-$client = new OIDCClient([
-    'client_id' => 'static-site-client',
-    'client_secret' => 'your_client_secret',  // From Keycloak
-    'redirect_uri' => 'http://192.168.1.130/callback',
-    'auth_endpoint' => 'http://192.168.1.134:8080/realms/org-realm/protocol/openid-connect/auth',
-    'token_endpoint' => 'http://192.168.1.134:8080/realms/org-realm/protocol/openid-connect/token',
-    'userinfo_endpoint' => 'http://192.168.1.134:8080/realms/org-realm/protocol/openid-connect/userinfo',
-    'end_session_endpoint' => 'http://192.168.1.134:8080/realms/org-realm/protocol/openid-connect/logout',
-    'scopes' => ['openid', 'profile', 'email']  // Include roles
-]);
+// Keycloak config
+$oidc = new OpenIDConnectClient(
+    'http://192.168.1.134:8080/realms/ZTAsite',  // Issuer URL
+    'static-site-client',  // Client ID from Keycloak
+    'k8IwaEPnJicnVKQeyXfSupDomgyC0krK'   // Client secret from Keycloak
+);
+$oidc->setRedirectURL('http://192.168.1.130/index.php');  // Callback to itself
 
-// Handle callback from Keycloak
+// Handle callback
 if (isset($_GET['code'])) {
     try {
-        $token = $client->handleCallback();  // Get tokens
-        $userInfo = $client->getUserInfo();  // Get user details/roles
+        $oidc->authenticate();  // Handle code, get tokens
+        $userInfo = $oidc->requestUserInfo();  // Get user details
 
-        // Check user and roles
-        $username = $userInfo['preferred_username'];
-        $roles = $userInfo['realm_access']['roles'] ?? [];
+        // Check user and roles from token
+        $username = $userInfo->preferred_username;
+        $roles = $userInfo->realm_access->roles ?? [];
 
         if ($username === 'user1' && in_array('user1-access', $roles)) {
-            include('user1.html');  // Embed user1 HTML here
+            include('user1.html');
         } elseif ($username === 'user2' && in_array('user2-access', $roles)) {
-            include('user1.html');  // Embed user2 HTML here
+            include('user2.html');
         } else {
             http_response_code(403);
             echo 'Access Denied';
         }
 
-        // Store token for session
-        $_SESSION['oidc_token'] = $token;
+        // Store for session (optional)
+        $_SESSION['oidc_id_token'] = $oidc->getIdToken();
     } catch (Exception $e) {
         echo 'Error: ' . $e->getMessage();
     }
 } else {
     // Redirect to Keycloak login
-    $client->authenticate();
+    $oidc->authenticate();
 }
