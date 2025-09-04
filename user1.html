@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stage 1: Building Virtual Machines for Network Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4 {
+            color: #333;
+        }
+
+        .section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: monospace;
+        }
+
+        ul,
+        ol {
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Stage 1: Build the Virtual Machines (VMs)</h1>
+        <p>This foundational stage sets up the virtual network infrastructure. Focus on creating isolated VMs to
+            simulate users, server, authentication, and the gateway. Use a hypervisor like VirtualBox for hosting. CPU,
+            RAM, and storage resources are allocated to each VM based on its role and anticipated workload. The network
+            is configured such that all traffic must route through the gateway, which acts as a central router with 4
+            network adapters: one bridged for internet access, and three internal networks. This ensures isolated
+            segments where VMs communicate only via the gateway, enhancing security simulation and preventing direct
+            inter-VM access.</p>
+    </header>
+
+    <div style="text-align: center; margin: 20px 0;">
+        <img src="NetworkZeroTrust.png" alt="Network Diagram" style="width: 100%; height: auto;">
+    </div>
+
+    <div class="section">
+        <h2>Subnet Configuration</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>NAME</th>
+                    <th>HOSTS AVAILABLE</th>
+                    <th>NETWORK ADDRESS</th>
+                    <th>SLASH</th>
+                    <th>MASK</th>
+                    <th>USABLE RANGE</th>
+                    <th>BROADCAST</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Users</td>
+                    <td>126</td>
+                    <td>192.168.1.0</td>
+                    <td>/25</td>
+                    <td>255.255.255.128</td>
+                    <td>192.168.1.1 - 192.168.1.126</td>
+                    <td>192.168.1.127</td>
+                </tr>
+                <tr>
+                    <td>Main</td>
+                    <td>2</td>
+                    <td>192.168.1.128</td>
+                    <td>/30</td>
+                    <td>255.255.255.252</td>
+                    <td>192.168.1.129 - 192.168.1.130</td>
+                    <td>192.168.1.131</td>
+                </tr>
+                <tr>
+                    <td>Auth</td>
+                    <td>2</td>
+                    <td>192.168.1.132</td>
+                    <td>/30</td>
+                    <td>255.255.255.252</td>
+                    <td>192.168.1.133 - 192.168.1.134</td>
+                    <td>192.168.1.135</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>1.1: Prepare the Host Environment</h2>
+        <ul>
+            <li><strong>Hypervisor Installation</strong>: Oracle VirtualBox (Version 7.1.10) is installed and configured
+                on the host system to manage the virtual machines.</li>
+            <li><strong>Resource Allocation</strong>: 4 GB RAM and 3 processor CPUs for all. Assign 60 GB storage to the
+                Main Server, Gateway, and Authentication VMs; assign 40 GB storage to the User VM(s).</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>1.2: Create User Virtual Machines</h2>
+        <ul>
+            <li><strong>VM Creation</strong>: 1-2 lightweight VMs (Linux Mint) are set up to simulate user environments.
+            </li>
+            <li><strong>Network Adapter Configuration</strong>:
+                <ul>
+                    <li>Each User VM's <strong>Adapter 1 is enabled and attached to the
+                            <code>Internal Network (Users intnet)</code></strong>.</li>
+                    <li>No direct access to other segments or the internet—route all traffic through the gateway.</li>
+                    <li>Ensure the VM uses DHCP to obtain an IP from the gateway (usable range:
+                        192.168.1.2-192.168.1.126).</li>
+                    <li>Disable IPv6 system-wide (follow the same steps as in the gateway VM below) to prevent
+                        conflicts.</li>
+                </ul>
+            </li>
+            <li><strong>Essential Tools</strong>: Ensure basic tools required for simulating access requests, such as
+                <strong>web browsers</strong> and <strong>sftp</strong>, are installed on these VMs.
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>1.3: Create Server Virtual Machines</h2>
+        <ul>
+            <li><strong>VM Creation</strong>: A dedicated VM (Ubuntu Server 24.04 LTS) as a Main Server is set up to
+                host protected resources and important data.</li>
+            <li><strong>Network Adapter Configuration</strong>:
+                <ul>
+                    <li>The Main Server VM's <strong>Adapter 1 is enabled and attached to the
+                            <code>Internal Network (Main intnet)</code></strong>.</li>
+                    <li>No direct access to other segments or the internet—route all traffic through the gateway.</li>
+                    <li>Ensure the VM uses DHCP to obtain an IP from the gateway (192.168.1.130).</li>
+                    <li>Disable IPv6 system-wide (follow the same steps as in the gateway VM below).</li>
+                </ul>
+            </li>
+            <li><strong>Install web applications</strong>:
+                <ul>
+                    <li>Update the system: <code>sudo apt update && sudo apt upgrade -y</code>.</li>
+                    <li>Install Apache, MySQL, and PHP (LAMP stack):
+                        <ul>
+                            <li>Install Apache:
+                                <code>sudo apt install apache2 -y; sudo systemctl start apache2; sudo systemctl enable apache2</code>.
+                            </li>
+                            <li>Install MySQL:
+                                <code>sudo apt install mysql-server -y; sudo systemctl start mysql; sudo systemctl enable mysql; sudo mysql_secure_installation</code>
+                                (set strong root password: "main", answer 'Y' to all prompts).
+                            </li>
+                            <li>Install PHP:
+                                <code>sudo apt install php libapache2-mod-php php-mysql -y; sudo systemctl restart apache2</code>.
+                            </li>
+                            <li>Test PHP:
+                                <code>echo "&lt;?php phpinfo(); ?&gt;" | sudo tee /var/www/html/phpinfo.php</code>
+                                (visit http://192.168.1.130/phpinfo.php, then delete the file).
+                            </li>
+                        </ul>
+                    </li>
+                    <li>Clone the web app repository:
+                        <code>sudo git clone https://github.com/MSTFA7/Web-App-Project.git /var/www/html/Web-App-Project</code>.
+                    </li>
+                    <li>Adjust permissions:
+                        <code>sudo chown -R www-data:www-data /var/www/html/Web-App-Project; sudo chmod -R 755 /var/www/html/Web-App-Project</code>.
+                    </li>
+                    <li>Set up MySQL database: Log into MySQL (<code>sudo mysql -u root -p</code>), then:
+                        <pre>
+CREATE DATABASE app_db;
+CREATE USER 'app_user'@'localhost' IDENTIFIED BY 'P@ssword12345';
+GRANT ALL PRIVILEGES ON app_db.* TO 'app_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+                        </pre>
+                    </li>
+                    <li>Import schema:
+                        <code>sudo mysql -u app_user -p app_db &lt; /var/www/html/Web-App-Project/database/database.sql</code>.
+                    </li>
+                    <li>Update config (/var/www/html/Web-App-Project/includes/database.php) with DB details:
+                        <pre>
+$db_server = "localhost";
+$db_user = "app_user";
+$db_pass = "P@ssword12345";
+$db_name = "app_db";
+                        </pre>
+                    </li>
+                    <li>Access and test: Visit http://192.168.1.130/Web-App-Project/index.php from a User VM.</li>
+                </ul>
+            </li>
+            <li><strong>SFTP Server Setup for Secure File Downloads</strong>:
+                <ul>
+                    <li>Install OpenSSH:
+                        <code>sudo apt install openssh-server -y; sudo systemctl enable ssh; sudo systemctl start ssh</code>.
+                    </li>
+                    <li>Create SFTP group/user:
+                        <code>sudo groupadd sftpusers; sudo adduser --shell /bin/false --ingroup sftpusers sftpuser</code>.
+                    </li>
+                    <li>Set up chroot directory:
+                        <code>sudo mkdir -p /var/sftp/files; sudo chown root:root /var/sftp; sudo chown sftpuser:sftpusers /var/sftp/files; sudo chmod 755 /var/sftp; sudo chmod 750 /var/sftp/files</code>.
+                    </li>
+                    <li>Insert some important data: Create 20 sample files
+                        (<code>for i in {1..20}; do echo "Sensitive data $i" > /var/sftp/files/file$i.txt; done</code>).
+                    </li>
+                    <li>Configure SSH (/etc/ssh/sshd_config):
+                        <pre>
+# Subsystem sftp /usr/lib/openssh/sftp-server
+Subsystem sftp internal-sftp
+AllowUsers sftpuser
+Match Group sftpusers
+ChrootDirectory /var/sftp
+ForceCommand internal-sftp
+AllowTcpForwarding no
+X11Forwarding no
+PasswordAuthentication no
+PubkeyAuthentication yes
+                        </pre>
+                    </li>
+                    <li>Restart SSH: <code>sudo systemctl restart ssh</code>.</li>
+                    <li><strong>Key-Based Authentication</strong>:
+                        <ul>
+                            <li>On the client machine, an SSH key pair (RSA 4096-bit) is generated:
+                                <code>ssh-keygen -t rsa -b 4096 -C "sftpuser@main.com"</code>.
+                            </li>
+                            <li>To add a User VM's key to the server:</li>
+                            <li>Edit <code>/etc/ssh/sshd_config</code> again: <code>PasswordAuthentication yes</code>
+                                and comment <code>AllowUsers sftpuser</code>. Add bash to the user:
+                                <code>sudo chsh -s /bin/bash sftpuser</code>.
+                            </li>
+                            <li>On the client machine, copy the public key to the server:
+                                <code>ssh-copy-id -i ~/.ssh/id_rsa.pub sftpuser@192.168.1.130</code>.
+                            </li>
+                            <li>Append the client key:
+                                <code>sudo chown -R sftpuser:sftpusers /home/sftpuser/.ssh; sudo chmod 700 /home/sftpuser/.ssh; sudo chmod 600 /home/sftpuser/.ssh/authorized_keys</code>.
+                            </li>
+                            <li>Then return <code>/etc/ssh/sshd_config</code> back:
+                                <code>PasswordAuthentication no</code> and uncomment <code>AllowUsers sftpuser</code>.
+                                Remove bash from the user: <code>sudo chsh -s /bin/false sftpuser</code>.
+                            </li>
+                        </ul>
+                    </li>
+                    <li>Test: From User VM, <code>sftp sftpuser@192.168.1.130</code>.</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>1.4: Create Security Gateway Virtual Machine</h2>
+        <ul>
+            <li><strong>VM Creation</strong>: A dedicated VM (Ubuntu Server 24.04 LTS) as a Gateway is set up to act as
+                the central gateway.</li>
+            <li><strong>Network Adapter Configuration</strong>: The Router VM is configured with <strong>four network
+                    adapters</strong> in VirtualBox settings:
+                <ul>
+                    <li><strong>Adapter 1</strong>: Enabled, Attached to <strong>Bridged Adapter</strong> (for external
+                        network access).</li>
+                    <li><strong>Adapter 2</strong>: Enabled, Attached to <strong>Internal Network
+                            (<code>Main intnet</code>)</strong> for the Main Server subnet.</li>
+                    <li><strong>Adapter 3</strong>: Enabled, Attached to <strong>Internal Network
+                            (<code>Auth intnet</code>)</strong> for the Authentication Server subnet.</li>
+                    <li><strong>Adapter 4</strong>: Enabled, Attached to <strong>Internal Network
+                            (<code>Users intnet</code>)</strong> for the Users subnet.</li>
+                </ul>
+            </li>
+            <li><strong>Inside VM setup</strong>:
+                <ul>
+                    <li>Boot and update: <code>sudo apt update && sudo apt upgrade</code>.</li>
+                    <li>Edit your Netplan file: <code>sudo nano /etc/netplan/50-cloud-init.yaml</code>. Add the
+                        following configuration:
+                        <pre>
+network:
+  version: 2
+  ethernets:
+    enp0s3:
+      dhcp4: true
+      nameservers:
+        addresses: [8.8.8.8, 8.8.4.4]
+    enp0s8: # Main subnet
+      dhcp4: no
+      addresses: [192.168.1.129/30]
+    enp0s9: # Auth subnet
+      dhcp4: no
+      addresses: [192.168.1.133/30]
+    enp0s10: # Users subnet
+      dhcp4: no
+      addresses: [192.168.1.1/25]
+                        </pre>
+                    </li>
+                    <li>Apply: <code>sudo netplan generate; sudo netplan apply</code>.</li>
+                    <li>Install DHCP (dnsmasq): <code>sudo apt install dnsmasq -y</code>.</li>
+                    <li>Configure /etc/dnsmasq.conf:
+                        <pre>
+bind-interfaces
+interface=enp0s8
+dhcp-range=192.168.1.130,192.168.1.130,255.255.255.252,24h
+dhcp-option=3,192.168.1.129
+interface=enp0s9
+dhcp-range=192.168.1.134,192.168.1.134,255.255.255.252,24h
+dhcp-option=3,192.168.1.133
+interface=enp0s10
+dhcp-range=192.168.1.2,192.168.1.126,255.255.255.128,24h
+dhcp-option=3,192.168.1.1
+dhcp-option=6,8.8.8.8,8.8.4.4
+                        </pre>
+                    </li>
+                    <li>Restart DHCP: <code>sudo systemctl restart dnsmasq; sudo systemctl enable dnsmasq</code>.</li>
+                    <li>Enable IP forwarding: Add <code>net.ipv4.ip_forward=1</code> to /etc/sysctl.conf;
+                        <code>sudo sysctl -p</code>.
+                    </li>
+                    <li>Set NAT:
+                        <code>sudo apt install iptables-persistent -y; sudo iptables -t nat -A POSTROUTING -o enp0s3 -j MASQUERADE; sudo netfilter-persistent save</code>.
+                    </li>
+                </ul>
+            </li>
+            <li><strong>Disable IPv6 system-wide</strong>:
+                <ul>
+                    <li>Add to /etc/sysctl.conf:
+                        <pre>
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+                        </pre>
+                    </li>
+                    <li>Apply: <code>sudo sysctl -p</code>.</li>
+                    <li>In Netplan: Add <code>link-local: []</code> under each interface;
+                        <code>sudo netplan generate; sudo netplan apply</code>.
+                    </li>
+                    <li>In GRUB (/etc/default/grub): Add
+                        <code>GRUB_CMDLINE_LINUX_DEFAULT="quiet splash ipv6.disable=1"</code>. Then,
+                        <code>sudo update-grub; sudo reboot</code>.
+                    </li>
+                </ul>
+            </li>
+            <li><strong>Traffic Monitoring and GUI Setup</strong>:
+                <ul>
+                    <li><strong>GUI Installation</strong>: A lightweight desktop environment like <strong>Xfce</strong>
+                        is installed (<code>sudo apt install xfce4 xfce4-goodies</code>), followed by a reboot. If the
+                        graphical login fails, a text console (<code>Ctrl+Alt+F1</code>) is used to update packages
+                        (<code>sudo apt update && sudo apt upgrade</code>), install and configure
+                        <strong>LightDM</strong> (<code>sudo apt install lightdm</code>,
+                        <code>sudo dpkg-reconfigure lightdm</code>), and reinstall Xfce components
+                        (<code>sudo apt install --reinstall xfce4 xfce4-goodies</code> or
+                        <code>sudo apt install xubuntu-desktop</code>).
+                    </li>
+                    <li><strong>Wireshark Installation</strong>: <strong>Wireshark</strong> is installed
+                        (<code>sudo apt install wireshark</code>). During installation, "No" is selected for non-root
+                        capture.</li>
+                    <li><strong>User Permissions for Wireshark</strong>: The current user is added to the
+                        <code>wireshark</code> group (<code>sudo usermod -a -G wireshark gateway</code>). Permissions on
+                        <code>dumpcap</code> are set
+                        (<code>sudo setcap cap_net_raw,cap_net_admin+eip /usr/bin/dumpcap</code>). The user must log out
+                        and log back in (or reboot) for the changes to take effect.
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>1.5: Create Authentication Virtual Machine</h2>
+        <ul>
+            <li><strong>VM Creation</strong>: A dedicated VM (Ubuntu Server 24.04 LTS) as a Authentication Server is set
+                up to function as the identity provider.</li>
+            <li><strong>Network Adapter Configuration</strong>:
+                <ul>
+                    <li>The Authentication Server VM's <strong>Adapter 1 is enabled and attached to the
+                            <code>Internal Network (Auth intnet)</code></strong>.</li>
+                    <li>No direct access to other segments or the internet—route all traffic through the gateway.</li>
+                    <li>Ensure the VM uses DHCP to obtain an IP from the gateway (192.168.1.134).</li>
+                    <li>Disable IPv6 system-wide (follow the same steps as in the gateway VM below).</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>1.6: Test Basic Connectivity</h2>
+        <ul>
+            <li><strong>Verify basic ping and traffic flow</strong>: Ensure users can only reach VMs and Internet
+                through the gateway; test isolation by confirming no direct pings between VMs.</li>
+            <li><strong>Monitor traffic</strong>: On gateway, use <code>sudo tcpdump -i enp0s8 -n -v</code> during
+                tests; use Wireshark GUI for detailed capture.</li>
+        </ul>
+    </div>
+</body>
+
+</html>

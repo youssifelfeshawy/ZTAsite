@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Summary: Secure Virtual Network Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        h1,
+        h2 {
+            color: #333;
+        }
+
+        .section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        ul {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Zero Trust Architecture (ZTA)</h1>
+        <p>This project involves setting up a simulated secure network using virtual machines (VMs) in VirtualBox. The
+            focus is on creating isolated environments for users, servers, and authentication, with all traffic routing
+            through a central gateway for enhanced security.</p>
+    </header>
+
+    <div style="text-align: center; margin: 20px 0;">
+        <img src="NetworkZeroTrust.png" alt="Network Diagram" style="width: 100%; height: auto;">
+    </div>
+
+    <div class="section">
+        <h2>Stage 1 Overview: Building the Virtual Machines</h2>
+        <p>In this stage, we establish the foundational virtual infrastructure:</p>
+        <ul>
+            <li><strong>Host Environment</strong>: Install Oracle VirtualBox (v7.1.10) and allocate resources (4GB RAM,
+                3 CPUs per VM; storage varies by role).</li>
+            <li><strong>User VMs</strong>: 1-2 lightweight Linux Mint VMs for simulating user access, connected to an
+                internal "Users" network.</li>
+            <li><strong>Main Server VM</strong>: Ubuntu Server hosting a web app (LAMP stack) and SFTP for secure file
+                access, on "Main" network.</li>
+            <li><strong>Gateway VM</strong>: Ubuntu Server acting as router with 4 adapters (bridged for internet,
+                internal for segments), handling DHCP, IP forwarding, and traffic monitoring with Wireshark.</li>
+            <li><strong>Authentication VM</strong>: Ubuntu Server for identity management, on "Auth" network.</li>
+            <li><strong>Network Setup</strong>: Isolated subnets (Users: 192.168.1.0/25, Main: 192.168.1.128/30, Auth:
+                192.168.1.132/30). All traffic routes through gateway; IPv6 disabled.</li>
+            <li><strong>Testing</strong>: Verify connectivity, isolation, and monitor traffic.</li>
+        </ul>
+        <p>The goal is to simulate a secure environment where VMs communicate only via the gateway, preventing direct
+            access and enabling security testing.</p>
+    </div>
+</body>
+
+</html>
