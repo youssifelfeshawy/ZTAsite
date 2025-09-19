@@ -8,6 +8,7 @@ import time
 import os
 from keycloak import KeycloakAdmin
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+import shutil
 
 # Load saved components
 meta_model = joblib.load("/opt/ml-models/meta_model.pkl")
@@ -79,24 +80,45 @@ EXPECTED_COLUMNS = [
 
 
 def extract_features_from_pcap(pcap_file):
-    """
-    Extract flow features from PCAP using CICFlowMeter.
-    Preprocess to match model's expected format.
-    """
-    # Run CICFlowMeter via subprocess
-    subprocess.run(
-        [
-            "java",
-            "-jar",
-            "/opt/cicflowmeter/CICFlowMeter.jar",
-            pcap_file,
-            "/tmp/features.csv",
-        ]
-    )
+    # """
+    # Extract flow features from PCAP using CICFlowMeter.
+    # Preprocess to match model's expected format.
+    # """
+    # # Run CICFlowMeter via subprocess
+    # subprocess.run(
+    #     [
+    #         "java",
+    #         "-jar",
+    #         "/opt/cicflowmeter/CICFlowMeter.jar",
+    #         pcap_file,
+    #         "/tmp/features.csv",
+    #     ]
+    # )
 
-    if os.path.exists("/tmp/features.csv") and os.path.getsize("/tmp/features.csv") > 0:
-        df = pd.read_csv("/tmp/features.csv")
+    # if os.path.exists("/tmp/features.csv") and os.path.getsize("/tmp/features.csv") > 0:
+    #     df = pd.read_csv("/tmp/features.csv")
 
+    pcap_dir = "/tmp/pcap_dir"
+    csv_dir = "/tmp/csv_out"
+
+    # Create fresh directories
+    if os.path.exists(pcap_dir):
+        shutil.rmtree(pcap_dir)
+    if os.path.exists(csv_dir):
+        shutil.rmtree(csv_dir)
+    os.makedirs(pcap_dir)
+    os.makedirs(csv_dir)
+
+    # Move the captured pcap into the processing directory
+    shutil.move(pcap_file, os.path.join(pcap_dir, "live_capture.pcap"))
+
+    # Run the feature extractor script
+    subprocess.run(["sh", "/opt/cicflowmeter/bin/cfm", pcap_dir, csv_dir])
+
+    # Find the output CSV file (its name will be based on the pcap file)
+    csv_file_path = os.path.join(csv_dir, "live_capture.pcap_Flow.csv")
+    if os.path.exists(csv_file_path) and os.path.getsize(csv_file_path) > 0:
+        df = pd.read_csv(csv_file_path)
         # CICFlowMeter column mappings (common ones; adjust based on exact output)
         column_mapping = {
             "Src IP": "srcip",
@@ -226,4 +248,3 @@ if __name__ == "__main__":
         time.sleep(10)  # Adjust interval
         if os.path.exists(pcap_file):
             os.remove(pcap_file)  # Clean up
-
