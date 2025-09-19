@@ -17,8 +17,9 @@ scaler = joblib.load("/opt/ml-models/scaler.pkl")
 
 # Initialize KeycloakAdmin
 KEYCLOAK_URL = "http://192.168.1.134:8080"  # Auth VM IP
+
 admin = KeycloakAdmin(
-    server_url=KEYCLOAK_URL + "/auth/",
+    server_url=KEYCLOAK_URL + "/",
     username="keycloak",  # Keycloak admin user
     password="keycloak",  # Change this!
     realm_name="master",  # Your realm
