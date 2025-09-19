@@ -18,9 +18,9 @@ scaler = joblib.load("/opt/ml-models/scaler.pkl")
 KEYCLOAK_URL = "http://192.168.1.134:8080"  # Auth VM IP
 admin = KeycloakAdmin(
     server_url=KEYCLOAK_URL + "/auth/",
-    username="admin",  # Keycloak admin user
-    password="admin",  # Change this!
-    realm_name="ZTAsite",  # Your realm
+    username="keycloak",  # Keycloak admin user
+    password="keycloak",  # Change this!
+    realm_name="master",  # Your realm
     verify=True,  # Set False if self-signed cert
 )
 
@@ -226,3 +226,4 @@ if __name__ == "__main__":
         time.sleep(10)  # Adjust interval
         if os.path.exists(pcap_file):
             os.remove(pcap_file)  # Clean up
+
