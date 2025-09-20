@@ -245,10 +245,8 @@ def revoke_sessions_for_ips(bad_ips):
 if __name__ == "__main__":
     while True:
         pcap_file = "/tmp/live_capture.pcap"
-        # Capture on users interface (enp0s10), 1000 packets
-        subprocess.run(
-            ["sudo", "tcpdump", "-i", "enp0s10", "-w", pcap_file, "-c", "30"]
-        )
+        # Capture on users interface (any), 1000 packets
+        subprocess.run(["sudo", "tcpdump", "-i", "any", "-w", pcap_file, "-c", "30"])
 
         flow_df = extract_features_from_pcap(pcap_file)
         if not flow_df.empty:
