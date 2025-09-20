@@ -6,7 +6,10 @@ from scapy.all import rdpcap  # Fallback if needed
 import subprocess
 import time
 import os
+import sys
 from keycloak import KeycloakAdmin
+
+# from keycloak.connection import KeycloakConnection
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 import shutil
 
@@ -16,14 +19,12 @@ base_models = joblib.load("/opt/ml-models/base_models.pkl")
 scaler = joblib.load("/opt/ml-models/scaler.pkl")
 
 # Initialize KeycloakAdmin
-KEYCLOAK_URL = "http://192.168.1.134:8080"  # Auth VM IP
-
 admin = KeycloakAdmin(
-    server_url=KEYCLOAK_URL + "/",
+    server_url="http://192.168.1.134:8080",  # Auth VM IP
     username="keycloak",  # Keycloak admin user
     password="keycloak",  # Change this!
     realm_name="master",  # Your realm
-    verify=True,  # Set False if self-signed cert
+    verify=False,  # Set False if self-signed cert
 )
 
 # Model's expected columns (from training: adjust if needed)
@@ -81,27 +82,8 @@ EXPECTED_COLUMNS = [
 
 
 def extract_features_from_pcap(pcap_file):
-    # """
-    # Extract flow features from PCAP using CICFlowMeter.
-    # Preprocess to match model's expected format.
-    # """
-    # # Run CICFlowMeter via subprocess
-    # subprocess.run(
-    #     [
-    #         "java",
-    #         "-jar",
-    #         "/opt/cicflowmeter/CICFlowMeter.jar",
-    #         pcap_file,
-    #         "/tmp/features.csv",
-    #     ]
-    # )
-
-    # if os.path.exists("/tmp/features.csv") and os.path.getsize("/tmp/features.csv") > 0:
-    #     df = pd.read_csv("/tmp/features.csv")
-
     pcap_dir = "/tmp/pcap_dir"
     csv_dir = "/tmp/csv_out"
-
     # Create fresh directories
     if os.path.exists(pcap_dir):
         shutil.rmtree(pcap_dir)
@@ -109,58 +91,87 @@ def extract_features_from_pcap(pcap_file):
         shutil.rmtree(csv_dir)
     os.makedirs(pcap_dir)
     os.makedirs(csv_dir)
-
     # Move the captured pcap into the processing directory
     shutil.move(pcap_file, os.path.join(pcap_dir, "live_capture.pcap"))
-
-    # Run the feature extractor script
-    subprocess.run(["sh", "/opt/cicflowmeter/bin/cfm", pcap_dir, csv_dir])
-
-    # Find the output CSV file (its name will be based on the pcap file)
-    csv_file_path = os.path.join(csv_dir, "live_capture.pcap_Flow.csv")
+    # Run CICFlowMeter CLI to extract features
+    pcap_path = os.path.join(pcap_dir, "live_capture.pcap")
+    csv_file_path = os.path.join(csv_dir, "live_capture_Flow.csv")
+    bin_dir = os.path.dirname(sys.executable)
+    cic_path = os.path.join(bin_dir, "cicflowmeter")
+    subprocess.run([cic_path, "-f", pcap_path, "-c", csv_file_path])
     if os.path.exists(csv_file_path) and os.path.getsize(csv_file_path) > 0:
         df = pd.read_csv(csv_file_path)
-        # CICFlowMeter column mappings (common ones; adjust based on exact output)
+        # CICFlowMeter column mappings (title-case to your mixed-case; added approximations)
         column_mapping = {
             "Src IP": "srcip",
             "Dst IP": "dstip",
             "Protocol": "proto",
-            "Source Port": "sport",
-            "Destination Port": "dsport",
+            "Src Port": "sport",
+            "Dst Port": "dsport",
             "Flow Duration": "dur",
-            "Total Source Bytes": "sbytes",
-            "Total Destination Bytes": "dbytes",
-            "Source TTL": "sttl",
-            "Destination TTL": "dttl",
-            # Add more mappings as needed (e.g., 'Packet Length Mean' -> 'smeansz'/'dmeansz')
-            # For missing: fill with defaults or drop rows
+            "TotLen Fwd Pkts": "sbytes",
+            "TotLen Bwd Pkts": "dbytes",
+            "Tot Fwd Pkts": "Spkts",
+            "Tot Bwd Pkts": "Dpkts",
+            "Fwd Pkt Len Mean": "smeansz",
+            "Bwd Pkt Len Mean": "dmeansz",
+            "Flow Bytes/s": "Sload",  # Approx; duplicate for Dload
+            "Flow Bytes/s": "Dload",
+            "Fwd IAT Mean": "Sjit",
+            "Bwd IAT Mean": "Djit",
+            "Fwd IAT Tot": "Sintpkt",
+            "Bwd IAT Tot": "Dintpkt",
+            "Init Fwd Win Byts": "swin",
+            "Init Bwd Win Byts": "dwin",
+            "Fwd Seg Size Min": "stcpb",  # Approx
+            "Bwd Seg Size Min": "dtcpb",
+            "Timestamp": "Stime",
+            "Last Time": "Ltime",
+            "PSH Flag Cnt": "trans_depth",  # Approx
+            "Fwd PSH Flags": "ct_flw_http_mthd",  # Approx HTTP/flag
+            "Response Body Len": "res_bdy_len",
+            "Flow IAT Mean": "tcprtt",  # Approx
+            "Fwd Header Len": "synack",  # Approx
+            "Bwd Header Len": "ackdat",
+            # Approx loss if CIC has it (some versions do)
+            "Fwd Pkts Lost": "sloss",
+            "Bwd Pkts Lost": "dloss",
+            # No direct for ct_*, sttl/dttl; fill 0
         }
         df.rename(columns=column_mapping, inplace=True)
-
-        # Select and align to expected columns (drop extras, fill missing)
-        df = df.reindex(
-            columns=EXPECTED_COLUMNS, fill_value=0
-        )  # Fill NaN with 0 for numerics
-        df = df.dropna(subset=["srcip", "dstip"])  # Drop invalid flows
-
-        # Handle categoricals (e.g., proto, state, service)
-        cat_cols = ["proto", "state", "service", "attack_cat"]  # Adjust
-        le_dict = {}  # Store encoders for consistency
+        # Align to expected columns
+        df = df.reindex(columns=EXPECTED_COLUMNS, fill_value=0)
+        df = df.dropna(subset=["srcip", "dstip"])
+        # Handle categoricals (include srcip/dstip as in training)
+        cat_cols = ["srcip", "dstip", "proto", "state", "service", "attack_cat"]
+        le_dict = {}
         for col in cat_cols:
             if col in df.columns:
                 le = LabelEncoder()
                 df[col] = le.fit_transform(df[col].astype(str).fillna("unknown"))
                 le_dict[col] = le
-
+        # Drop columns dropped in training (updated list to fix unseen features)
+        dropped_in_training = [
+            "sloss",
+            "dloss",
+            "Dpkts",
+            "dwin",
+            "Ltime",
+            "ct_srv_dst",
+            "ct_src_dport_ltm",
+            "ct_dst_src_ltm",
+            "is_ftp_login",
+            "ct_flw_http_mthd",
+            "ct_ftp_cmd",  # Added to resolve current error
+        ]
         # Scale features (exclude labels)
         features = df.drop(columns=["label", "attack_cat"], errors="ignore")
-        df[features.columns] = scaler.transform(features)
-
-        # Ensure 'srcip' is string for later use
+        features = features.drop(columns=dropped_in_training, errors="ignore")
+        features[features.columns] = scaler.transform(features)
+        df[features.columns] = features  # Merge scaled back
         df["srcip"] = df["srcip"].astype(str)
-
         return df
-    return pd.DataFrame()  # Empty if failed
+    return pd.DataFrame()
 
 
 def get_trust_metrics(data):
@@ -169,15 +180,15 @@ def get_trust_metrics(data):
     """
     metrics = []
     for attack, info in base_models.items():
-        if info["features"] not in data.columns.tolist():
-            continue  # Skip if features missing
+        # Check if all required features are present (updated check)
+        if not all(feature in data.columns for feature in info["features"]):
+            continue  # Skip if any features missing
         X_sel = data[info["features"]]
-        X_sel_scaled = scaler.transform(X_sel)
         if "Sequential" in str(type(info["model"])):
-            pred = info["model"].predict(X_sel_scaled).flatten()
+            pred = info["model"].predict(X_sel.values).flatten()  # For ANN/TF models
         else:
-            pred = info["model"].predict(X_sel_scaled)
-        metrics.append((pred > info["threshold"]).astype(int))  # Binary decisions
+            pred = info["model"].predict(X_sel.values)  # For sklearn models like RF
+        metrics.append((pred > info["threshold"]).astype(int))
     return np.column_stack(metrics) if metrics else np.array([])
 
 
@@ -236,7 +247,7 @@ if __name__ == "__main__":
         pcap_file = "/tmp/live_capture.pcap"
         # Capture on users interface (enp0s10), 1000 packets
         subprocess.run(
-            ["sudo", "tcpdump", "-i", "enp0s10", "-w", pcap_file, "-c", "1000"]
+            ["sudo", "tcpdump", "-i", "enp0s10", "-w", pcap_file, "-c", "30"]
         )
 
         flow_df = extract_features_from_pcap(pcap_file)
