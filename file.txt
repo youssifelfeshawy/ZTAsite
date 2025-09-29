@@ -1,0 +1,16 @@
+[Unit]
+Description=Keycloak Identity and Access Management
+After=network.target postgresql.service
+
+[Service]
+User=keycloak
+Group=keycloak
+WorkingDirectory=/opt/keycloak/keycloak-26.0.0
+ExecStart=/opt/keycloak/keycloak-26.0.0/bin/kc.sh start-dev
+SuccessExitStatus=143
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
