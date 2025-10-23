@@ -20,7 +20,7 @@ scaler = joblib.load("/opt/ml-models/scaler.pkl")
 
 # Initialize KeycloakAdmin
 admin = KeycloakAdmin(
-    server_url="http://192.168.1.134:8080",  # Auth VM IP
+    server_url="http://10.0.0.134:8080",  # Auth VM IP
     username="keycloak",  # Keycloak admin user
     password="keycloak",  # Change this!
     realm_name="master",  # Your realm
@@ -258,3 +258,4 @@ if __name__ == "__main__":
         time.sleep(10)  # Adjust interval
         if os.path.exists(pcap_file):
             os.remove(pcap_file)  # Clean up
+
